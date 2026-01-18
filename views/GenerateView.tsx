@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AspectRatio, ImageSize } from '../types';
 import { generateImage } from '../services/geminiService';
@@ -61,7 +62,7 @@ export const GenerateView: React.FC = () => {
           <Sparkles className="w-6 h-6 text-indigo-400" />
           Generar Imagen
         </h2>
-        <p className="text-slate-400 mt-1">Crea visuales impresionantes con Gemini 3.0 Pro.</p>
+        <p className="text-slate-400 mt-1">Crea visuales de alto impacto con Gemini 3 Flash.</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-0">
@@ -90,25 +91,6 @@ export const GenerateView: React.FC = () => {
                   }`}
                 >
                   {ar}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Tamaño</label>
-            <div className="flex space-x-2">
-              {Object.values(ImageSize).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(s)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-all ${
-                    size === s
-                      ? 'bg-indigo-600 border-indigo-500 text-white'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {s}
                 </button>
               ))}
             </div>
@@ -163,7 +145,7 @@ export const GenerateView: React.FC = () => {
           ) : (
             <div className="text-center text-slate-500">
               <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-20" />
-              <p>Ajusta los parámetros y genera una obra maestra.</p>
+              <p>Generación ultrarrápida impulsada por Flash.</p>
             </div>
           )}
         </div>

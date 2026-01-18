@@ -17,8 +17,6 @@ const ApiKeyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         const selected = await window.aistudio.hasSelectedApiKey();
         setHasKey(selected);
       } else {
-        // Fallback for non-AI Studio environments if necessary, 
-        // but guidelines say assume it's there.
         setHasKey(true); 
       }
     };
@@ -28,7 +26,6 @@ const ApiKeyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const handleOpenKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      // Per guidelines: assume success after triggering
       setHasKey(true);
     }
   };
@@ -42,9 +39,9 @@ const ApiKeyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 mx-auto">
             <Key className="w-8 h-8 text-indigo-400" />
           </div>
-          <h1 className="text-2xl font-bold text-center mb-2">Configuración Requerida</h1>
+          <h1 className="text-2xl font-bold text-center mb-2">Configuración de Gemini</h1>
           <p className="text-slate-400 text-center mb-8 text-sm">
-            Para utilizar los modelos de alta fidelidad como <span className="text-indigo-300 font-mono">Gemini 3 Pro</span>, debes seleccionar tu propia clave de API de un proyecto con facturación activa.
+            Para disfrutar de la velocidad de <span className="text-indigo-300 font-mono">Gemini 3 Flash</span>, selecciona tu clave de API de un proyecto con facturación habilitada.
           </p>
           
           <div className="space-y-4">
@@ -68,7 +65,7 @@ const ApiKeyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
           
           <p className="mt-8 text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">
-            OptiMedia Studio • Powered by Gemini 3
+            OptiMedia Studio • Powered by Gemini 3 Flash
           </p>
         </div>
       </div>

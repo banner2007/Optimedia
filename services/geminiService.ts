@@ -25,7 +25,7 @@ export const analyzeImage = async (base64Data: string, mimeType: string, prompt:
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
@@ -33,7 +33,8 @@ export const analyzeImage = async (base64Data: string, mimeType: string, prompt:
         ]
       },
       config: {
-        thinkingConfig: { thinkingBudget: 4000 }
+        // Flash supports thinking but we keep budget balanced for speed
+        thinkingConfig: { thinkingBudget: 2000 }
       }
     });
     return response.text || "No se generó ningún análisis.";
@@ -55,14 +56,14 @@ export const generateImage = async (
     if (aspectRatio === AspectRatio.CINEMATIC_21_9) apiRatio = AspectRatio.LANDSCAPE_16_9;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.5-flash-image',
       contents: {
         parts: [{ text: prompt }]
       },
       config: {
         imageConfig: {
           aspectRatio: apiRatio as any,
-          imageSize: size
+          // imageSize is only for Pro models, omitting for Flash
         }
       }
     });
@@ -106,31 +107,27 @@ export const editImage = async (
       let finalPrompt = "";
       
       if (websiteUrl) {
-        finalPrompt = `OBJETIVO: Crear un anuncio visual de alto impacto basado en este sitio web: ${websiteUrl}.\n`;
-        finalPrompt += `INSTRUCCIONES DE DISEÑO:\n1. INVESTIGACIÓN: Busca el producto principal y su PRECIO real.\n2. ELEMENTOS: Incluye un HOOK, el PRECIO y un CTA ('¡Compra Ahora!').\n3. ESTILO: Adapta el branding al sitio web proporcionado.\n`;
+        finalPrompt = `OBJETIVO: Crear un diseño optimizado basado en el branding de ${websiteUrl}.\n`;
+        finalPrompt += `INSTRUCCIONES: Integra el estilo visual del sitio. Si es un anuncio, incluye un Call to Action claro.\n`;
       }
 
       if (brandLogo) {
         parts.push({ inlineData: { mimeType: brandLogo.mime, data: brandLogo.data } });
-        finalPrompt += `\nESTILO DE MARCA REQUERIDO:
-        1. PALETA DE COLORES: Extrae los colores exactos del icono/logo adjunto y aplícalos en toda la imagen (fondos, textos, elementos decorativos).
-        2. INTEGRACIÓN DEL LOGO: Puedes colocar el logo gráficamente en la composición si mejora el diseño. 
-        3. REGLA CRÍTICA: El logo NO debe repetirse. Solo una instancia clara por imagen. No modifiques sus colores ni formas originales.`;
+        finalPrompt += `\nESTILO DE MARCA: Usa los colores y estética del logo adjunto. Integra el logo de forma natural y equilibrada en la composición final.`;
       }
 
-      finalPrompt += `\nINSTRUCCIÓN ADICIONAL DEL USUARIO: ${prompt}`;
+      finalPrompt += `\nINSTRUCCIÓN DE EDICIÓN: ${prompt}`;
       
       parts.push({ text: finalPrompt });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-2.5-flash-image',
         contents: { parts },
         config: {
           imageConfig: {
-            imageSize: size,
             aspectRatio: apiRatio as any
-          },
-          tools: websiteUrl ? [{ googleSearch: {} }] : []
+          }
+          // tools like googleSearch are only for Pro image models
         }
       });
 
