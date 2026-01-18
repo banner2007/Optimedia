@@ -1,5 +1,6 @@
 export enum AppMode {
   ANALYZE = 'ANALYZE',
+  GENERATE = 'GENERATE',
   EDIT = 'EDIT',
   HISTORY = 'HISTORY',
 }
@@ -15,12 +16,11 @@ export enum AspectRatio {
   CINEMATIC_21_9 = '21:9',
 }
 
-// ImageSize se elimina ya que el redimensionamiento ahora será personalizado en la vista de edición.
-// export enum ImageSize {
-//   SIZE_1K = '1K',
-//   SIZE_2K = '2K',
-//   SIZE_4K = '4K',
-// }
+export enum ImageSize {
+  SIZE_1K = '1K',
+  SIZE_2K = '2K',
+  SIZE_4K = '4K',
+}
 
 export interface GeneratedImage {
   url: string;
@@ -29,28 +29,23 @@ export interface GeneratedImage {
 
 export interface SavedItem {
   id: string;
-  type: 'EDIT' | 'ANALYZE'; // Se elimina 'GENERATE'
+  type: 'GENERATE' | 'EDIT' | 'ANALYZE';
   imageUrl: string;
-  prompt: string; // Esto podría convertirse en 'notes' o 'description' en el futuro
+  prompt: string;
   timestamp: any;
   config?: {
-    // Los campos de configuración se adaptarán a las nuevas funcionalidades de edición
-    width?: number;
-    height?: number;
-    format?: string;
-    quality?: number;
+    size?: string;
     ratio?: string;
   };
 }
 
-// AIStudio global interface se elimina ya que la app no requiere API Key
-// declare global {
-//   interface AIStudio {
-//     hasSelectedApiKey: () => Promise<boolean>;
-//     openSelectKey: () => Promise<void>;
-//   }
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
 
-//   interface Window {
-//     aistudio?: AIStudio;
-//   }
-// }
+  interface Window {
+    aistudio?: AIStudio;
+  }
+}

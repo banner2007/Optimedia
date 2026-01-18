@@ -1,29 +1,18 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { analyzeImage } from '../services/geminiService';
 import { saveIconAsset, getIconAssets, deleteIconAsset, deleteAllIcons } from '../services/persistenceService';
 import { ImageUpload } from '../components/ImageUpload';
-import { ScanSearch, Bot, RefreshCcw, Trash2, Image as ImageIcon, Loader2, Eraser, AlertCircle, Info, FileText, ImageIcon as FileImageIcon, Maximize } from 'lucide-react';
+import { ScanSearch, Bot, RefreshCcw, Trash2, Image as ImageIcon, Loader2, Bot as BotIcon, Eraser, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-// Helper to convert base64 to Blob for size calculation
-const base64ToBlob = (base64: string, mimeType: string): Blob => {
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: mimeType });
-};
-
-// Main component
 export const AnalyzeView: React.FC = () => {
-  const [image, setImage] = useState<{data: string, mime: string, url: string} | null>(null);
-  const [notes, setNotes] = useState(''); // Renombrado de prompt a notes
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [image, setImage] = useState<{data: string, mime: string} | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // Nuevo estado para errores
   
   // Icon Library State
   const [icons, setIcons] = useState<any[]>([]);
@@ -37,98 +26,43 @@ export const AnalyzeView: React.FC = () => {
 
   const loadIcons = async () => {
     setIconsLoading(true);
-    setError(null);
+    setError(null); // Limpiar errores al cargar
     try {
       const data = await getIconAssets();
       setIcons(data);
     } catch (err: any) {
       console.error("Error loading icons:", err);
-      setError(err.message);
+      setError(err.message); // Mostrar el mensaje de error al usuario
     } finally {
       setIconsLoading(false);
     }
   };
 
-  const performAnalysis = useCallback(async (base64Data: string, mimeType: string) => {
+  const handleAnalyze = async () => {
+    if (!image) return;
     setLoading(true);
-    setError(null);
+    setError(null); // Limpiar errores antes de analizar
     try {
-      const blob = base64ToBlob(base64Data, mimeType);
-      const sizeKB = (blob.size / 1024).toFixed(2);
-
-      let metadataText = `### Análisis de Metadatos\n\n`;
-      metadataText += `- **Tamaño del Archivo:** ${sizeKB} KB\n`;
-      metadataText += `- **Tipo MIME:** \`${mimeType}\`\n`;
-
-      // Get image dimensions using an Image object
-      const img = new Image();
-      const imageUrl = `data:${mimeType};base64,${base64Data}`;
-      img.src = imageUrl;
-
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-
-      metadataText += `- **Dimensiones:** ${img.width}x${img.height} px\n`;
-      metadataText += `- **Relación de Aspecto:** ${(img.width / img.height).toFixed(2)}:1\n`;
-
-      // Basic optimization suggestions
-      metadataText += `\n### Sugerencias de Optimización\n\n`;
-      if (mimeType.includes('image/png')) {
-        metadataText += `Es un PNG. Bueno para imágenes con transparencia o gráficos nítidos. Para fotos, considera convertir a WebP o JPEG para reducir el tamaño.\n`;
-      } else if (mimeType.includes('image/jpeg')) {
-        metadataText += `Es un JPEG. Bueno para fotografías. Considera ajustar la calidad o convertir a WebP para una mayor compresión sin mucha pérdida visual.\n`;
-      } else if (mimeType.includes('image/gif')) {
-        metadataText += `Es un GIF. Útil para animaciones simples. Para imágenes estáticas, WebP o PNG suelen ser mejores opciones por su eficiencia.\n`;
-      } else if (mimeType.includes('image/webp')) {
-        metadataText += `Es un WebP. Excelente formato moderno para la web, ofrece buena compresión y calidad. ¡Bien hecho!\n`;
-      } else {
-        metadataText += `Formato \`${mimeType}\`. Asegúrate de que sea compatible con los navegadores. WebP es una opción moderna recomendada.\n`;
-      }
-
-      if (parseFloat(sizeKB) > 300) {
-        metadataText += `El archivo es bastante grande (${sizeKB} KB). Redimensionar o comprimir podría mejorar drásticamente los tiempos de carga web.\n`;
-      } else if (parseFloat(sizeKB) > 100) {
-        metadataText += `El tamaño del archivo es moderado. Una pequeña optimización podría ser beneficiosa para la velocidad de la página.\n`;
-      } else {
-        metadataText += `El tamaño del archivo es bueno para la web. ¡Continúa así!\n`;
-      }
-
-      setAnalysisResult(metadataText);
-      setImage({ data: base64Data, mime: mimeType, url: imageUrl });
-
-    } catch (err: any) {
-      console.error("Error performing client-side analysis:", err);
-      setError(err.message || "Error al analizar la imagen localmente.");
-      setAnalysisResult(null);
-      setImage(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleImageSelected = useCallback((base64Data: string, mimeType: string) => {
-    // base64Data ya viene sin el prefijo "data:..."
-    performAnalysis(base64Data, mimeType);
-  }, [performAnalysis]);
-
-  const handleSaveToLibrary = async () => {
-    if (!image || !analysisResult) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const iconName = notes 
-        ? (notes.length > 25 ? notes.substring(0, 25) + '...' : notes) 
-        : `Activo ${icons.length + 1}`;
+      // 1. Obtener el análisis de Gemini
+      const text = await analyzeImage(image.data, image.mime, prompt);
+      setResult(text);
       
-      const newIcon = await saveIconAsset(image.url, iconName, analysisResult);
+      // 2. Solo después de recibir la respuesta, guardar en la biblioteca
+      const iconName = prompt 
+        ? (prompt.length > 25 ? prompt.substring(0, 25) + '...' : prompt) 
+        : `Análisis ${icons.length + 1}`;
+      
+      const fullBase64 = `data:${image.mime};base64,${image.data}`;
+      const newIcon = await saveIconAsset(fullBase64, iconName, text);
+      
+      // 3. Actualizar la UI local con el nuevo activo
       setIcons(prev => [newIcon, ...prev]);
       setSelectedIconId(newIcon.id);
       
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Error al guardar en la biblioteca. Por favor intenta de nuevo.");
+      setResult(null); // Limpiar el resultado si hay un error
+      setError(err.message || "Error al analizar la imagen. Por favor intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -136,20 +70,14 @@ export const AnalyzeView: React.FC = () => {
 
   const handleSelectIcon = (icon: any) => {
     setSelectedIconId(icon.id);
-    setAnalysisResult(icon.analysisResult || "No hay análisis disponible para esta imagen.");
-    setNotes(icon.name);
-    setError(null);
-    
-    // Asumiendo que imageUrl ya es un data URL o URL pública
-    // Extraemos base64 y mimeType para el análisis si el icono fue cargado desde url pura
-    const match = icon.imageUrl.match(/^data:(.+);base64,(.+)$/);
-    if (match) {
-        setImage({ data: match[2], mime: match[1], url: icon.imageUrl });
-    } else {
-        // Si no es un data URL, no podemos hacer un análisis en el cliente directamente
-        // pero podemos mostrar la imagen
-        setImage({ data: "", mime: "image/png", url: icon.imageUrl }); // Data vacía si no es base64
-    }
+    setResult(icon.analysisResult || "No hay análisis disponible para esta imagen.");
+    setPrompt(icon.name);
+    setError(null); // Limpiar errores al seleccionar un icono
+    // Convert download URL or existing path to preview object
+    setImage({
+      data: icon.imageUrl, // For preview, using the URL directly in a simplified way
+      mime: 'image/png' // Assuming standard format for the preview container
+    });
   };
 
   const handleDeleteIcon = async (e: React.MouseEvent, id: string, storagePath?: string) => {
@@ -157,7 +85,7 @@ export const AnalyzeView: React.FC = () => {
     e.stopPropagation();
     if (!confirm("¿Eliminar este activo?")) return;
     setDeletingId(id);
-    setError(null);
+    setError(null); // Limpiar errores antes de eliminar
     try {
       await deleteIconAsset(id, storagePath);
       setIcons(prev => prev.filter(icon => icon.id !== id));
@@ -166,7 +94,7 @@ export const AnalyzeView: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Delete failed", err);
-      setError(err.message);
+      setError(err.message); // Mostrar el mensaje de error al usuario
     } finally {
       setDeletingId(null);
     }
@@ -176,14 +104,14 @@ export const AnalyzeView: React.FC = () => {
     if (icons.length === 0) return;
     if (!confirm("¿Borrar toda la biblioteca?")) return;
     setDeletingAll(true);
-    setError(null);
+    setError(null); // Limpiar errores antes de eliminar todo
     try {
       await deleteAllIcons();
       setIcons([]);
       handleReset();
     } catch (err: any) {
       console.error("Delete all failed", err);
-      setError(err.message);
+      setError(err.message); // Mostrar el mensaje de error al usuario
     } finally {
       setDeletingAll(false);
     }
@@ -191,10 +119,10 @@ export const AnalyzeView: React.FC = () => {
 
   const handleReset = () => {
     setImage(null);
-    setAnalysisResult(null);
-    setNotes('');
+    setResult(null);
+    setPrompt('');
     setSelectedIconId(null);
-    setError(null);
+    setError(null); // Limpiar errores al resetear
   };
 
   return (
@@ -202,9 +130,9 @@ export const AnalyzeView: React.FC = () => {
       <header>
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
           <ScanSearch className="w-6 h-6 text-indigo-400" />
-          Análisis de Activos y Metadatos
+          Análisis y Activos de Marca
         </h2>
-        <p className="text-slate-400 mt-1">Sube o selecciona un activo para ver sus metadatos y sugerencias de optimización.</p>
+        <p className="text-slate-400 mt-1">Selecciona un activo guardado para ver su análisis o sube uno nuevo.</p>
       </header>
 
       {/* Brand Icons Library Section */}
@@ -256,7 +184,7 @@ export const AnalyzeView: React.FC = () => {
             ))
           )}
         </div>
-        {error && (
+        {error && ( // Mostrar error debajo de la biblioteca
              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                <p>{error}</p>
@@ -267,11 +195,11 @@ export const AnalyzeView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
           {!image ? (
-            <ImageUpload onImageSelected={handleImageSelected} label="Subir imagen para analizar y guardar en biblioteca" />
+            <ImageUpload onImageSelected={(data, mime) => setImage({ data, mime })} label="Subir imagen para analizar y guardar en biblioteca" />
           ) : (
             <div className="relative group overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/40">
               <img 
-                src={image.url} 
+                src={image.data.startsWith('http') || image.data.startsWith('data:') ? image.data : `data:${image.mime};base64,${image.data}`} 
                 className="w-full max-h-[400px] object-contain mx-auto" 
                 alt="Preview" 
               />
@@ -283,32 +211,31 @@ export const AnalyzeView: React.FC = () => {
           <div className="flex gap-2">
             <input 
               type="text" 
-              value={notes} 
-              onChange={(e) => setNotes(e.target.value)} 
-              placeholder="Añade notas o etiquetas para la imagen (ej: logo principal, campaña)" 
+              value={prompt} 
+              onChange={(e) => setPrompt(e.target.value)} 
+              placeholder="¿Qué quieres saber? (Ej: Describe el estilo visual)" 
               className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
             />
             <button 
-              onClick={handleSaveToLibrary} 
-              disabled={!image || loading || !analysisResult} 
+              onClick={handleAnalyze} 
+              disabled={!image || loading} 
               className={`px-6 py-2 rounded-xl text-white font-semibold flex items-center justify-center transition-all ${
-                loading || !image || !analysisResult ? 'bg-indigo-600/50 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
+                loading ? 'bg-indigo-600/50 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20'
               }`}
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Info className="w-5 h-5" />}
-              <span>{loading ? 'Analizando...' : 'Guardar Activo'}</span>
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BotIcon className="w-5 h-5" />}
             </button>
           </div>
         </div>
         <div className="bg-slate-800/30 rounded-3xl p-8 border border-slate-700 min-h-[400px] shadow-inner overflow-auto">
-          {analysisResult ? (
+          {result ? (
             <div key={selectedIconId || 'current'} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-               <ReactMarkdown className="prose prose-invert max-w-none prose-sm sm:prose-base">{analysisResult}</ReactMarkdown>
+               <ReactMarkdown className="prose prose-invert max-w-none prose-sm sm:prose-base">{result}</ReactMarkdown>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
-               <FileText className="w-12 h-12 opacity-10" />
-               <p className="text-center italic text-sm">Sube una imagen o selecciona una de la biblioteca.<br/>El análisis de metadatos se conservará permanentemente para cada activo.</p>
+               <Bot className="w-12 h-12 opacity-10" />
+               <p className="text-center italic text-sm">Sube una imagen o selecciona una de la biblioteca.<br/>El análisis se conservará permanentemente para cada activo.</p>
             </div>
           )}
         </div>

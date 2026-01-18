@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppMode } from '../types';
-import { Image, ScanSearch, Settings2, History } from 'lucide-react';
+import { Image, ImagePlus, ScanSearch, Settings2, History } from 'lucide-react';
 
 interface SidebarProps {
   currentMode: AppMode;
@@ -9,9 +9,9 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentMode, onModeChange }) => {
   const navItems = [
-    { mode: AppMode.ANALYZE, label: 'Analizar', icon: ScanSearch, desc: 'Metadatos y Formatos' },
-    // { mode: AppMode.GENERATE, label: 'Generar', icon: ImagePlus, desc: 'Crear Arte Nuevo' }, // Eliminado
-    { mode: AppMode.EDIT, label: 'Editar y Optimizar', icon: Settings2, desc: 'Redimensionar, Comprimir, Convertir' },
+    { mode: AppMode.ANALYZE, label: 'Analizar', icon: ScanSearch, desc: 'Entender y Etiquetar' },
+    { mode: AppMode.GENERATE, label: 'Generar', icon: ImagePlus, desc: 'Crear Arte Nuevo' },
+    { mode: AppMode.EDIT, label: 'Editar y Optimizar', icon: Settings2, desc: 'Refinar y Convertir' },
     { mode: AppMode.HISTORY, label: 'Historial', icon: History, desc: 'Tus Creaciones' },
   ];
 

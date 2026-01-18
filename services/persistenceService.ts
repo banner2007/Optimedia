@@ -10,19 +10,20 @@ import {
   doc,
   writeBatch
 } from "firebase/firestore";
+// Import SavedItem to provide proper typing for history items
 import { SavedItem } from "../types";
 
 const HISTORY_COLLECTION = "history";
 const ASSETS_COLLECTION = "assets";
 
 /**
- * Guarda un trabajo de edición o análisis en el historial.
+ * Guarda un trabajo de generación o edición en el historial.
  */
-export async function saveWork(type: 'EDIT' | 'ANALYZE', imageUrl: string, promptOrNotes: string, config: any = {}) {
+export async function saveWork(type: string, imageUrl: string, prompt: string, config: any = {}) {
   const docRef = await addDoc(collection(db, HISTORY_COLLECTION), {
     type,
     imageUrl,
-    prompt: promptOrNotes, // 'prompt' se mantiene por compatibilidad, pero ahora puede ser 'notes'
+    prompt,
     config,
     timestamp: Date.now(),
   });
@@ -32,6 +33,7 @@ export async function saveWork(type: 'EDIT' | 'ANALYZE', imageUrl: string, promp
 /**
  * Obtiene el historial completo de trabajos.
  */
+// Added explicit return type and cast to SavedItem to resolve the "missing properties" TypeScript error in HistoryView.
 export async function getHistory(): Promise<SavedItem[]> {
   try {
     const q = query(collection(db, HISTORY_COLLECTION), orderBy("timestamp", "desc"));
@@ -48,20 +50,20 @@ export async function getHistory(): Promise<SavedItem[]> {
 }
 
 /**
- * Guarda un activo de marca (icono/logo) con sus notas/análisis de metadatos.
+ * Guarda un activo de marca (icono/logo) con su análisis.
  */
-export async function saveIconAsset(imageUrl: string, name: string, analysisResultOrNotes: string) {
+export async function saveIconAsset(imageUrl: string, name: string, analysisResult: string) {
   const docRef = await addDoc(collection(db, ASSETS_COLLECTION), {
     imageUrl,
     name,
-    analysisResult: analysisResultOrNotes, // analysisResult ahora contendrá las notas o metadatos
+    analysisResult,
     timestamp: Date.now(),
   });
   return { 
     id: docRef.id, 
     imageUrl, 
     name, 
-    analysisResult: analysisResultOrNotes, 
+    analysisResult, 
     timestamp: Date.now() 
   };
 }
@@ -69,6 +71,7 @@ export async function saveIconAsset(imageUrl: string, name: string, analysisResu
 /**
  * Obtiene todos los activos de marca guardados.
  */
+// Added explicit return type for consistency.
 export async function getIconAssets(): Promise<any[]> {
   try {
     const q = query(collection(db, ASSETS_COLLECTION), orderBy("timestamp", "desc"));
@@ -84,6 +87,7 @@ export async function getIconAssets(): Promise<any[]> {
  * Elimina un activo de marca específico.
  */
 export async function deleteIconAsset(id: string, storagePath?: string) {
+  // Nota: Si se usara Firebase Storage para archivos físicos, aquí se eliminaría también el path.
   await deleteDoc(doc(db, ASSETS_COLLECTION, id));
 }
 

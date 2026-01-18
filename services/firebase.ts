@@ -11,10 +11,10 @@ const firebaseConfig = {
   appId: "1:773497522944:web:60f2a39be5e6b8318801e5",
 };
 
-// Inicialización segura (evita errores de doble carga)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase App singleton
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// 🔥 SERVICIOS
+// Initialize and Export Services explicitly with the app instance
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 

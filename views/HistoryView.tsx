@@ -1,13 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
-import { getHistory, deleteHistoryItem } from '../services/persistenceService'; // Importar deleteHistoryItem
+import { getHistory } from '../services/persistenceService';
 import { SavedItem } from '../types';
-import { History, Download, Calendar, ExternalLink, Loader2, RefreshCcw, Info, Trash2 } from 'lucide-react';
+import { History, Download, Calendar, ExternalLink, Loader2, RefreshCcw, Info } from 'lucide-react';
 
 export const HistoryView: React.FC = () => {
   const [items, setItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null); // Estado para el elemento que se está eliminando
 
   useEffect(() => {
     loadHistory();
@@ -24,21 +23,6 @@ export const HistoryView: React.FC = () => {
       setLoading(false);
     }
   };
-
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este elemento del historial?")) return;
-    setDeletingId(id);
-    try {
-      await deleteHistoryItem(id);
-      setItems(prevItems => prevItems.filter(item => item.id !== id));
-    } catch (err) {
-      console.error("Error deleting history item:", err);
-      alert("Error al eliminar el elemento del historial.");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
 
   const formatDate = (ts: any) => {
     if (!ts) return "Fecha desconocida";
@@ -95,10 +79,10 @@ export const HistoryView: React.FC = () => {
                 />
                 <div className="absolute top-3 left-3">
                   <span className={`px-2 py-1 rounded text-[10px] font-bold text-white shadow-lg ${
-                    item.type === 'ANALYZE' ? 'bg-indigo-600' : // Ahora 'ANALYZE' en lugar de 'GENERATE'
+                    item.type === 'GENERATE' ? 'bg-indigo-600' : 
                     item.type === 'EDIT' ? 'bg-emerald-600' : 'bg-amber-600'
                   }`}>
-                    {item.type === 'ANALYZE' ? 'ANÁLISIS' : 'EDICIÓN'}
+                    {item.type}
                   </span>
                 </div>
                 <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 backdrop-blur-[2px]">
@@ -123,14 +107,6 @@ export const HistoryView: React.FC = () => {
                   >
                     <Download className="w-5 h-5" />
                   </button>
-                  <button 
-                    onClick={() => handleDeleteItem(item.id)}
-                    disabled={deletingId === item.id}
-                    className="p-3 bg-red-600 rounded-full text-white hover:bg-red-500 transition-all hover:scale-110 shadow-lg"
-                    title="Eliminar del historial"
-                  >
-                    {deletingId === item.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                  </button>
                 </div>
               </div>
               
@@ -140,24 +116,14 @@ export const HistoryView: React.FC = () => {
                   {formatDate(item.timestamp)}
                 </div>
                 <p className="text-xs text-slate-300 line-clamp-2 mb-4 italic leading-relaxed">
-                  "{item.prompt}" {/* 'prompt' ahora puede ser 'notes' o descripción */}
+                  "{item.prompt}"
                 </p>
                 
                 <div className="mt-auto pt-4 border-t border-slate-700/50 flex justify-between items-center">
                   <div className="flex gap-2">
-                    {item.config?.width && item.config?.height && (
+                    {item.config?.size && (
                       <span className="text-[10px] bg-slate-700/50 px-2 py-0.5 rounded text-slate-400 border border-slate-600">
-                        {item.config.width}x{item.config.height}px
-                      </span>
-                    )}
-                    {item.config?.format && (
-                      <span className="text-[10px] bg-slate-700/50 px-2 py-0.5 rounded text-slate-400 border border-slate-600">
-                        {item.config.format.split('/')[1].toUpperCase()}
-                      </span>
-                    )}
-                    {item.config?.quality && (
-                      <span className="text-[10px] bg-slate-700/50 px-2 py-0.5 rounded text-slate-400 border border-slate-600">
-                        {item.config.quality}%
+                        {item.config.size}
                       </span>
                     )}
                     {item.config?.ratio && (
