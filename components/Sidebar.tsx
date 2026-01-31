@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { AppMode } from '../types';
-import { Image, ImagePlus, ScanSearch, Settings2, History } from 'lucide-react';
+import { Image, ImagePlus, ScanSearch, Settings2, History, LayoutTemplate } from 'lucide-react';
 
 interface SidebarProps {
   currentMode: AppMode;
@@ -12,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentMode, onModeChange }) =
     { mode: AppMode.ANALYZE, label: 'Analizar', icon: ScanSearch, desc: 'Entender y Etiquetar' },
     { mode: AppMode.GENERATE, label: 'Generar', icon: ImagePlus, desc: 'Crear Arte Nuevo' },
     { mode: AppMode.EDIT, label: 'Editar y Optimizar', icon: Settings2, desc: 'Refinar y Convertir' },
+    { mode: AppMode.LANDING, label: 'Landing/Banners', icon: LayoutTemplate, desc: 'Generador Ecommerce' },
     { mode: AppMode.HISTORY, label: 'Historial', icon: History, desc: 'Tus Creaciones' },
   ];
 
@@ -48,8 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentMode, onModeChange }) =
 
       <div className="mt-auto px-4">
         <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 hidden md:block">
-          <h3 className="text-xs font-semibold text-slate-300 mb-1">Impulsado por Firebase</h3>
-          <p className="text-[10px] text-slate-500">Historial persistente activado</p>
+          <h3 className="text-xs font-semibold text-slate-300 mb-1">Personal Studio</h3>
+          <p className="text-[10px] text-slate-500">Mínimo costo, máxima potencia.</p>
         </div>
       </div>
     </div>

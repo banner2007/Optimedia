@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { analyzeImage } from '../services/geminiService';
 import { saveIconAsset, getIconAssets, deleteIconAsset, deleteAllIcons } from '../services/persistenceService';
@@ -30,7 +31,6 @@ export const AnalyzeView: React.FC = () => {
       setIcons(data);
     } catch (err: any) {
       console.warn("Biblioteca de Firestore no disponible:", err.message);
-      // No bloqueamos la UI, solo mostramos el error en la sección de biblioteca
       if (err.message.includes("BASE DE DATOS NO CONFIGURADA")) {
         setError(err.message);
       }
@@ -44,18 +44,15 @@ export const AnalyzeView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Obtener el análisis de Gemini (esto SIEMPRE debe funcionar si el API Key es correcto)
       const text = await analyzeImage(image.data, image.mime, prompt);
       setResult(text);
       
-      // 2. Intentar guardar en la biblioteca (esto puede fallar si Firestore no está configurado)
       try {
         const iconName = prompt 
           ? (prompt.length > 25 ? prompt.substring(0, 25) + '...' : prompt) 
           : `Análisis ${icons.length + 1}`;
         
-        const fullBase64 = `data:${image.mime};base64,${image.data}`;
-        const newIcon = await saveIconAsset(fullBase64, iconName, text);
+        const newIcon = await saveIconAsset(image.data, image.mime, iconName, text);
         
         if (newIcon) {
           setIcons(prev => [newIcon, ...prev]);
@@ -63,8 +60,7 @@ export const AnalyzeView: React.FC = () => {
         }
       } catch (saveErr: any) {
         console.warn("No se pudo guardar el activo en Firestore:", saveErr.message);
-        // Informamos al usuario que el análisis se hizo pero no se guardó
-        setError("Análisis completado, pero no se pudo guardar en la biblioteca porque Firestore no está configurado.");
+        setError("Análisis completado, pero no se pudo guardar en la biblioteca (Posible error de CORS o Firestore).");
       }
       
     } catch (err: any) {
@@ -79,7 +75,7 @@ export const AnalyzeView: React.FC = () => {
     setSelectedIconId(icon.id);
     setResult(icon.analysisResult || "No hay análisis disponible.");
     setPrompt(icon.name);
-    setImage({ data: icon.imageUrl, mime: 'image/png' });
+    setImage({ data: icon.imageUrl, mime: icon.mimeType || 'image/png' });
   };
 
   const handleDeleteIcon = async (e: React.MouseEvent, id: string, storagePath?: string) => {
@@ -129,7 +125,6 @@ export const AnalyzeView: React.FC = () => {
         <p className="text-slate-400 mt-1">Entiende tus imágenes y gestiónalas como activos permanentes.</p>
       </header>
 
-      {/* Brand Icons Library Section */}
       <section className="bg-slate-800/20 border border-slate-700/50 rounded-3xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

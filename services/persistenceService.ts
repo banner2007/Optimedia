@@ -1,4 +1,5 @@
-import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
+
+import { ref, uploadString, getDownloadURL, deleteObject, getBytes } from "firebase/storage";
 import { getStorageInstance, getDb } from "./firebase";
 import { collection, addDoc, getDocs, doc, deleteDoc, query, orderBy } from "firebase/firestore";
 import { SavedItem } from "../types";
@@ -10,26 +11,40 @@ const generateLocalId = () => Math.random().toString(36).substring(2, 15);
 const handleFirestoreError = (error: any, context: string) => {
   const msg = error?.message || "";
   console.error(`Error en ${context}:`, error);
-  
-  if (msg.includes("Service firestore is not available")) {
-    throw new Error(
-      "⚠️ ERROR TÉCNICO DE LIBRERÍA:\n\n" +
-      "Hubo un conflicto cargando los módulos de Firebase. Se ha corregido en el código, por favor refresca la página con Ctrl+F5."
-    );
-  }
-
-  if (msg.includes("permission-denied")) {
-    throw new Error(
-      "⚠️ ERROR DE PERMISOS:\n\n" +
-      "Firebase está rechazando la conexión. Asegúrate de que las reglas en la consola estén publicadas."
-    );
-  }
-  
   throw new Error(`Error en ${context}: ${msg}`);
 };
 
+/**
+ * Descarga un archivo directamente de Storage como ArrayBuffer y lo convierte a Base64.
+ * Este método evita los bloqueos de CORS del navegador al no usar URLs públicas.
+ */
+export const downloadBase64 = async (storagePath: string, mimeType: string = 'image/png'): Promise<string> => {
+  try {
+    const storage = getStorageInstance();
+    const storageRef = ref(storage, storagePath);
+    const buffer = await getBytes(storageRef);
+    
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunk = 8192;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    }
+    return btoa(binary);
+  } catch (error: any) {
+    console.error("Error descargando datos de Storage:", error);
+    if (error.code === 'storage/unauthorized') {
+      throw new Error("Sin permisos. Verifica las reglas de Storage.");
+    }
+    if (error.message?.includes('CORS') || error.code?.includes('network')) {
+      throw new Error("CORS bloqueado. Ejecuta el comando 'gsutil cors' en Cloud Shell.");
+    }
+    throw error;
+  }
+};
+
 export const saveWork = async (
-  type: 'GENERATE' | 'EDIT' | 'ANALYZE',
+  type: 'GENERATE' | 'EDIT' | 'ANALYZE' | 'LANDING',
   base64Data: string,
   prompt: string,
   config?: any
@@ -58,7 +73,7 @@ export const saveWork = async (
 
     return newItem.id;
   } catch (error) {
-    console.warn("Error guardando en la nube", error);
+    console.warn("Error guardando localmente", error);
     throw error;
   }
 };
@@ -72,7 +87,7 @@ export const getHistory = async (): Promise<SavedItem[]> => {
   }
 };
 
-export const saveIconAsset = async (base64Data: string, name: string, analysisResult?: string) => {
+export const saveIconAsset = async (base64Data: string, mimeType: string, name: string, analysisResult?: string) => {
   try {
     const db = getDb();
     const fileName = `icon_${Date.now()}_${name.replace(/\s+/g, '_').substring(0, 50)}`;
@@ -80,7 +95,7 @@ export const saveIconAsset = async (base64Data: string, name: string, analysisRe
     const storage = getStorageInstance();
     const storageRef = ref(storage, storagePath);
     
-    const dataUrl = base64Data.startsWith('data:') ? base64Data : `data:image/png;base64,${base64Data}`;
+    const dataUrl = base64Data.startsWith('data:') ? base64Data : `data:${mimeType};base64,${base64Data}`;
     
     const uploadResult = await uploadString(storageRef, dataUrl, 'data_url');
     const downloadUrl = await getDownloadURL(uploadResult.ref);
@@ -90,6 +105,7 @@ export const saveIconAsset = async (base64Data: string, name: string, analysisRe
       name,
       imageUrl: downloadUrl,
       storagePath,
+      mimeType,
       analysisResult: analysisResult || '',
       timestamp: Date.now()
     });
@@ -98,7 +114,7 @@ export const saveIconAsset = async (base64Data: string, name: string, analysisRe
       id: docRef.id,
       name,
       imageUrl: downloadUrl,
-      base64: dataUrl,
+      mimeType,
       storagePath,
       analysisResult: analysisResult || '',
       timestamp: Date.now()

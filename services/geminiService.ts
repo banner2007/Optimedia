@@ -1,22 +1,17 @@
 
+// @google/genai Gemini Service for OptiMedia Studio
 import { GoogleGenAI } from "@google/genai";
-import { AspectRatio, ImageSize } from "../types";
+import { AspectRatio, ImageSize, GeneratedImage } from "../types";
 
-/**
- * Re-initiates the API client to ensure it uses the most current API_KEY.
- */
 const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
-/**
- * Resets key selection if a specific error occurs.
- */
 const handleApiError = async (error: any) => {
   console.error("Gemini API Error:", error);
   if (error?.message?.includes("Requested entity was not found.") && window.aistudio) {
     await window.aistudio.openSelectKey();
-    throw new Error("Clave de API no válida o proyecto no encontrado. Por favor, selecciona una clave de un proyecto con facturación.");
+    throw new Error("Clave de API no válida o proyecto no encontrado.");
   }
   throw error;
 };
@@ -29,17 +24,45 @@ export const analyzeImage = async (base64Data: string, mimeType: string, prompt:
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
-          { text: prompt || "Analiza esta imagen en detalle. Describe el contenido, estilo y uso potencial para web o redes sociales." }
+          { text: prompt || "Analiza esta imagen para uso web/social media." }
         ]
       },
       config: {
-        // Flash supports thinking but we keep budget balanced for speed
-        thinkingConfig: { thinkingBudget: 2000 }
+        thinkingConfig: { thinkingBudget: 512 } 
       }
     });
     return response.text || "No se generó ningún análisis.";
   } catch (error) {
     return handleApiError(error);
+  }
+};
+
+export const generatePaletteFromContext = async (
+  productBase64: string,
+  productMime: string,
+  productInfo: string
+) => {
+  try {
+    const ai = getAIClient();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          { inlineData: { mimeType: productMime, data: productBase64 } },
+          { text: `Based on this product and info: "${productInfo}", provide a professional marketing color palette. 
+          Return ONLY a JSON array of 5 hex codes. Example: ["#FFFFFF", "#000000", ...]` }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+    
+    const text = response.text || "[]";
+    return JSON.parse(text) as string[];
+  } catch (error) {
+    console.warn("No se pudo generar paleta automática, usando default.");
+    return ["#4F46E5", "#06B6D4", "#1E293B", "#F8FAFC", "#6366F1"];
   }
 };
 
@@ -50,20 +73,21 @@ export const generateImage = async (
 ) => {
   try {
     const ai = getAIClient();
-    let apiRatio = aspectRatio;
-    if (aspectRatio === AspectRatio.PORTRAIT_2_3) apiRatio = AspectRatio.PORTRAIT_3_4;
-    if (aspectRatio === AspectRatio.LANDSCAPE_3_2) apiRatio = AspectRatio.LANDSCAPE_4_3;
-    if (aspectRatio === AspectRatio.CINEMATIC_21_9) apiRatio = AspectRatio.LANDSCAPE_16_9;
+    const model = (size === ImageSize.SIZE_2K || size === ImageSize.SIZE_4K) 
+      ? 'gemini-3-pro-image-preview' 
+      : 'gemini-2.5-flash-image';
+    
+    const imageSizeConfig = size === ImageSize.SIZE_4K ? "4K" : size === ImageSize.SIZE_2K ? "2K" : "1K";
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model,
       contents: {
         parts: [{ text: prompt }]
       },
       config: {
         imageConfig: {
-          aspectRatio: apiRatio as any,
-          // imageSize is only for Pro models, omitting for Flash
+          aspectRatio: aspectRatio as any,
+          ...(model === 'gemini-3-pro-image-preview' ? { imageSize: imageSizeConfig } : {})
         }
       }
     });
@@ -76,87 +100,130 @@ export const generateImage = async (
         };
       }
     }
-    throw new Error("No se generó ninguna imagen en la respuesta.");
+    throw new Error("No se generó ninguna imagen.");
   } catch (error) {
     return handleApiError(error);
   }
 };
 
 export const editImage = async (
-  base64Data: string,
-  mimeType: string,
+  sourceBase64: string,
+  sourceMime: string,
   prompt: string,
-  count: number = 4,
-  size: ImageSize = ImageSize.SIZE_1K,
-  aspectRatios: AspectRatio[] = [AspectRatio.SQUARE_1_1],
-  brandLogo: { data: string; mime: string } | null = null,
-  websiteUrl: string = ""
-) => {
-  const generateVariation = async (targetRatio: AspectRatio) => {
-    try {
-      const ai = getAIClient();
-      let apiRatio = targetRatio;
-      if (targetRatio === AspectRatio.PORTRAIT_2_3) apiRatio = AspectRatio.PORTRAIT_3_4;
-      if (targetRatio === AspectRatio.LANDSCAPE_3_2) apiRatio = AspectRatio.LANDSCAPE_4_3;
-      if (targetRatio === AspectRatio.CINEMATIC_21_9) apiRatio = AspectRatio.LANDSCAPE_16_9;
+  variantCount: number,
+  size: ImageSize,
+  ratios: AspectRatio[],
+  brandLogo: { data: string, mime: string } | null,
+  websiteUrl: string
+): Promise<GeneratedImage[]> => {
+  try {
+    const ai = getAIClient();
+    const results: GeneratedImage[] = [];
+    const model = (size === ImageSize.SIZE_2K || size === ImageSize.SIZE_4K) 
+      ? 'gemini-3-pro-image-preview' 
+      : 'gemini-2.5-flash-image';
+    const imageSizeConfig = size === ImageSize.SIZE_4K ? "4K" : size === ImageSize.SIZE_2K ? "2K" : "1K";
+    const ratio = ratios[0] || AspectRatio.SQUARE_1_1;
 
-      const parts: any[] = [
-        { inlineData: { mimeType, data: base64Data } }
-      ];
-
-      let finalPrompt = "";
+    for (let i = 0; i < variantCount; i++) {
+      const parts: any[] = [{ inlineData: { mimeType: sourceMime, data: sourceBase64 } }];
+      if (brandLogo) parts.push({ inlineData: { mimeType: brandLogo.mime, data: brandLogo.data } });
       
-      if (websiteUrl) {
-        finalPrompt = `OBJETIVO: Crear un diseño optimizado basado en el branding de ${websiteUrl}.\n`;
-        finalPrompt += `INSTRUCCIONES: Integra el estilo visual del sitio. Si es un anuncio, incluye un Call to Action claro.\n`;
-      }
-
-      if (brandLogo) {
-        parts.push({ inlineData: { mimeType: brandLogo.mime, data: brandLogo.data } });
-        finalPrompt += `\nESTILO DE MARCA: Usa los colores y estética del logo adjunto. Integra el logo de forma natural y equilibrada en la composición final.`;
-      }
-
-      finalPrompt += `\nINSTRUCCIÓN DE EDICIÓN: ${prompt}`;
-      
+      let finalPrompt = `${prompt}. Ensure a high-end commercial aesthetic.`;
+      if (brandLogo) finalPrompt += " Seamlessly integrate the brand logo into a natural position in the scene.";
+      if (websiteUrl) finalPrompt += ` Match the visual mood of ${websiteUrl}.`;
       parts.push({ text: finalPrompt });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model,
         contents: { parts },
         config: {
           imageConfig: {
-            aspectRatio: apiRatio as any
+            aspectRatio: ratio as any,
+            ...(model === 'gemini-3-pro-image-preview' ? { imageSize: imageSizeConfig } : {})
           }
-          // tools like googleSearch are only for Pro image models
         }
       });
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
-          return {
+          results.push({
             url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
             mimeType: part.inlineData.mimeType
-          };
+          });
+          break;
         }
       }
-      return null;
-    } catch (error) {
-      console.warn("Error en generación de variante", error);
-      return null;
     }
-  };
-
-  const promises = Array(count).fill(null).map((_, index) => {
-    const ratioToUse = aspectRatios[index % aspectRatios.length];
-    return generateVariation(ratioToUse);
-  });
-  
-  const results = await Promise.all(promises);
-  const validImages = results.filter((img): img is { url: string; mimeType: string } => img !== null);
-
-  if (validImages.length === 0) {
-    throw new Error("No se pudieron generar las variantes.");
+    return results;
+  } catch (error) {
+    return handleApiError(error);
   }
+};
 
-  return validImages;
+export const generateLandingBanner = async (
+  productBase64: string,
+  productMime: string,
+  styleBase64: string | null,
+  styleMime: string | null,
+  headline: string,
+  offer: string,
+  cta: string,
+  aspectRatio: AspectRatio,
+  productInfo: string = "",
+  palette: string[] = [],
+  brandLogo: { data: string, mime: string } | null = null
+) => {
+  try {
+    const ai = getAIClient();
+    const parts: any[] = [{ inlineData: { mimeType: productMime, data: productBase64 } }];
+    if (styleBase64) parts.push({ inlineData: { mimeType: styleMime, data: styleBase64 } });
+    if (brandLogo) parts.push({ inlineData: { mimeType: brandLogo.mime, data: brandLogo.data } });
+
+    const paletteStr = palette.length > 0 ? `Color Theme: ${palette.join(', ')}.` : '';
+
+    // PROMPT DE MARKETING AVANZADO
+    const marketingPrompt = `Task: Create an IRRESISTIBLE and CONVINCING high-conversion advertising banner.
+    
+    PRODUCT ANALYSIS FROM PROVIDED INFO:
+    "${productInfo}"
+    
+    SCENE REQUIREMENTS:
+    1. VISUAL STORYTELLING: Do not just show the product. Based on the product info, create a scene that solves a problem or fulfils a dream. 
+       - If the info implies 'Energy', use dynamic lighting and motion blur.
+       - If it implies 'Luxury', use rich bokeh, golden hour lighting, and premium textures.
+       - If it's 'Tech', use clean, futuristic, and sharp laboratory-style lighting.
+    2. EMOTIONAL IMPACT: The lighting, background, and props must make the viewer feel the benefits of the product described in the text.
+    3. BRAND INTEGRATION: ${brandLogo ? 'Expertly place the provided brand logo to look like a high-budget professional campaign.' : 'Maintain a clean, high-end professional look.'}
+    4. COLOR PSYCHOLOGY: ${paletteStr} Use these colors to influence mood and legibility.
+    
+    OVERLAY TEXT (Render professionally within the image):
+    - Headline: "${headline}" (Bold, high-impact typography)
+    - Offer: "${offer}" (Secondary focus, elegant)
+    - CTA Button: "${cta}" (Vibrant, high-contrast, looks clickable)
+    
+    STYLE: Modern high-end photography. If a style reference image is provided, blend its soul and aesthetic with the new composition, but make the result UNIQUE and IRRESISTIBLE.`;
+
+    parts.push({ text: marketingPrompt });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: { parts },
+      config: {
+        imageConfig: { aspectRatio: aspectRatio as any }
+      }
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return {
+          url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+          mimeType: part.inlineData.mimeType
+        };
+      }
+    }
+    throw new Error("No se pudo generar el banner.");
+  } catch (error) {
+    return handleApiError(error);
+  }
 };

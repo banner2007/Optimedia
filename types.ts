@@ -1,8 +1,10 @@
+
 export enum AppMode {
   ANALYZE = 'ANALYZE',
   GENERATE = 'GENERATE',
   EDIT = 'EDIT',
   HISTORY = 'HISTORY',
+  LANDING = 'LANDING',
 }
 
 export enum AspectRatio {
@@ -29,13 +31,15 @@ export interface GeneratedImage {
 
 export interface SavedItem {
   id: string;
-  type: 'GENERATE' | 'EDIT' | 'ANALYZE';
+  type: 'GENERATE' | 'EDIT' | 'ANALYZE' | 'LANDING';
   imageUrl: string;
   prompt: string;
   timestamp: any;
   config?: {
     size?: string;
     ratio?: string;
+    headline?: string;
+    offer?: string;
   };
 }
 

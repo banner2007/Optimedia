@@ -5,6 +5,7 @@ import { AnalyzeView } from './views/AnalyzeView';
 import { GenerateView } from './views/GenerateView';
 import { EditView } from './views/EditView';
 import { HistoryView } from './views/HistoryView';
+import { LandingView } from './views/LandingView';
 import { AppMode } from './types';
 import { Key, ShieldAlert, ExternalLink, ArrowRight } from 'lucide-react';
 
@@ -90,6 +91,7 @@ function App() {
             {mode === AppMode.ANALYZE && <AnalyzeView />}
             {mode === AppMode.GENERATE && <GenerateView />}
             {mode === AppMode.EDIT && <EditView />}
+            {mode === AppMode.LANDING && <LandingView />}
             {mode === AppMode.HISTORY && <HistoryView />}
           </div>
         </main>
